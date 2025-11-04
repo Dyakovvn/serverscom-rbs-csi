@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rbs-csi-controller
+  namespace: kube-system
+  labels:
+    app: rbs-csi-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rbs-csi-controller
+  template:
+    metadata:
+      labels:
+        app: rbs-csi-controller
+    spec:
+      serviceAccountName: rbs-csi-controller-sa
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: csi-provisioner
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v3.5.0
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--v=2"
+            - "--leader-election"
+            - "--timeout=10m"
+            - "--extra-create-metadata"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+
+        - name: csi-attacher
+          image: k8s.gcr.io/sig-storage/csi-attacher:v4.3.0
+          args:
+            - "--v=2"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+
+        - name: csi-resizer
+          image: k8s.gcr.io/sig-storage/csi-resizer:v1.8.0
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--v=2"
+            - "--leader-election"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+
+        - name: rbs-csi-driver
+          image: ghcr.io/serverscom/rbs-csi-driver:{{VERSION}}
+          command: ["/bin/rbs-csi-controller"]
+          imagePullPolicy: Always
+          args:
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--v=2"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
+            - name: SERVERSCOM_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: rbs-csi-secret
+                  key: api-url
+            - name: SERVERSCOM_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: rbs-csi-secret
+                  key: api-token
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+          resources:
+            limits:
+              memory: "200Mi"
+              cpu: "100m"
+            requests:
+              memory: "100Mi"
+              cpu: "50m"
+
+      volumes:
+        - name: socket-dir
+          emptyDir: {}

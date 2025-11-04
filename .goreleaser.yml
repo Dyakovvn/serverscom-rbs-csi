@@ -1,0 +1,64 @@
+---
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - ./scripts/build-deploy-manifest.sh {{ .Version }}
+
+builds:
+  - id: controller
+    main: ./cmd/controller
+    binary: rbs-csi-controller
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.gitCommit={{ .ShortCommit }}
+  - id: node
+    main: ./cmd/node
+    binary: rbs-csi-node
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.gitCommit={{ .ShortCommit }}
+
+dockers:
+  - dockerfile: Dockerfile
+    build_flag_templates:
+      - "--platform=linux/amd64"
+    goarch: amd64
+    image_templates: ["ghcr.io/serverscom/rbs-csi-driver:v{{ .Version }}-amd64"]
+    use: buildx
+    ids:
+      - controller
+      - node
+  - dockerfile: Dockerfile
+    build_flag_templates:
+      - "--platform=linux/arm64"
+    goarch: arm64
+    image_templates: ["ghcr.io/serverscom/rbs-csi-driver:v{{ .Version }}-arm64v8"]
+    use: buildx
+    ids:
+      - controller
+      - node
+
+docker_manifests:
+  - name_template: ghcr.io/serverscom/rbs-csi-driver:v{{ .Version }}
+    image_templates:
+      - ghcr.io/serverscom/rbs-csi-driver:v{{ .Version }}-amd64
+      - ghcr.io/serverscom/rbs-csi-driver:v{{ .Version }}-arm64v8
+
+release:
+  draft: true
+  extra_files:
+    - glob: "rbs-csi-deploy-*.yaml"

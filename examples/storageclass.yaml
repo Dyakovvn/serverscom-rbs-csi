@@ -1,0 +1,24 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: rbs-ssd-high-performance
+provisioner: rbs.csi.servers.com
+parameters:
+  # Required parameters
+  rbs.csi.servers.com/location: "1"     # Location ID where volumes will be created
+  rbs.csi.servers.com/flavor: "1"       # Flavor ID for SSD high performance
+
+  # Optional parameters
+  rbs.csi.servers.com/labels: '{"environment":"production","project":"web-app"}'
+
+  # Filesystem type (optional, defaults to ext4)
+  fstype: xfs
+
+# Volume expansion support
+allowVolumeExpansion: true
+
+# Volume binding mode
+volumeBindingMode: WaitForFirstConsumer
+
+# Reclaim policy
+reclaimPolicy: Delete
