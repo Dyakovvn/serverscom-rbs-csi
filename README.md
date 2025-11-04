@@ -22,11 +22,11 @@ kubectl create secret generic rbs-csi-secret \
   --from-literal=api-token="your-api-token" \
   --namespace=kube-system
 
-# 2. Deploy driver
-kubectl apply -f deploy/rbac.yaml
-kubectl apply -f deploy/csi-driver.yaml
-kubectl apply -f deploy/controller.yaml
-kubectl apply -f deploy/node-daemonset.yaml
+# 2. Deploy latest driver version
+kubectl apply -f https://github.com/serverscom/serverscom-rbs-csi/releases/latest/download/rbs-csi-deploy.yaml
+
+# or specific version
+kubectl apply -f https://github.com/serverscom/serverscom-rbs-csi/releases/download/v0.1.0/rbs-csi-deploy.yaml
 
 # 3. Create StorageClass
 kubectl apply -f examples/storageclass.yaml

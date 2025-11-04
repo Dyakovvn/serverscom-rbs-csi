@@ -61,4 +61,4 @@ docker_manifests:
 release:
   draft: true
   extra_files:
-    - glob: "rbs-csi-deploy-*.yaml"
+    - glob: "rbs-csi-deploy.yaml"

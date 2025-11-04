@@ -3,7 +3,7 @@ set -euo pipefail
 
 VERSION="$1"
 
-OUTPUT="rbs-csi-deploy-${VERSION}.yaml"
+OUTPUT="rbs-csi-deploy.yaml"
 
 echo "# Generated deploy manifest for version ${VERSION}" > "$OUTPUT"
 echo "# Do not edit manually" >> "$OUTPUT"
