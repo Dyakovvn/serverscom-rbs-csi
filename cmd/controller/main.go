@@ -9,6 +9,8 @@ import (
 
 	"github.com/serverscom/rbs-csi-driver/pkg/controller"
 	"github.com/serverscom/rbs-csi-driver/pkg/util"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 )
 
@@ -37,10 +39,21 @@ func main() {
 		"commit", gitCommit,
 	)
 
+	kubeConfig, err := rest.InClusterConfig()
+	if err != nil {
+		klog.Fatalf("get in cluster config failed: %v", err)
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		klog.Fatalf("create new k8s clientset failed: %v", err)
+	}
+
 	config := &controller.Config{
 		Endpoint:    *endpoint,
 		RBSAPIUrl:   apiBaseURL,
 		RBSAPIToken: apiToken,
+		KubeClient:  kubeClient,
 	}
 
 	ctrl, err := controller.NewController(config)

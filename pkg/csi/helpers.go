@@ -8,6 +8,7 @@ import (
 	"time"
 
 	serverscom "github.com/serverscom/serverscom-go-client/pkg"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -71,25 +72,14 @@ func (s *ControllerService) getLabels(parameters map[string]string) map[string]s
 	return labels
 }
 
-// getPVCLabels extracts PVC labels from CSI parameters
-// External-provisioner with --extra-create-metadata passes PVC labels as:
-// csi.storage.k8s.io/pvc/labels.<label-key> = <label-value>
-func (s *ControllerService) getPVCLabels(parameters map[string]string) map[string]string {
-	const pvcLabelPrefix = "csi.storage.k8s.io/pvc/labels."
-	labels := make(map[string]string)
-
-	for key, value := range parameters {
-		if len(key) > len(pvcLabelPrefix) && key[:len(pvcLabelPrefix)] == pvcLabelPrefix {
-			labelKey := key[len(pvcLabelPrefix):]
-			labels[labelKey] = value
-		}
+// getPVCLabels extracts PVC labels via k8s API
+func (s *ControllerService) getPVCLabels(ctx context.Context, namespace, name string) (map[string]string, error) {
+	pvc, err := s.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
 	}
 
-	if len(labels) == 0 {
-		return nil
-	}
-
-	return labels
+	return pvc.Labels, nil
 }
 
 // waitForVolumeActive polls every 5 seconds volume status until it gets active

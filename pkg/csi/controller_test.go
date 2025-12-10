@@ -11,7 +11,10 @@ import (
 
 	"github.com/serverscom/rbs-csi-driver/pkg/mocks"
 	serverscom "github.com/serverscom/serverscom-go-client/pkg"
+	"k8s.io/client-go/kubernetes/fake"
 )
+
+var kubeFakeClient = fake.NewSimpleClientset()
 
 func TestCreateVolume_SuccessWithIDs(t *testing.T) {
 	g := NewGomegaWithT(t)
@@ -19,7 +22,7 @@ func TestCreateVolume_SuccessWithIDs(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockSvc := mocks.NewMockRBSService(ctrl)
-	svc := NewControllerService(mockSvc)
+	svc := NewControllerService(mockSvc, kubeFakeClient)
 
 	ctx := context.Background()
 	req := &csi.CreateVolumeRequest{
@@ -63,7 +66,7 @@ func TestCreateVolume_SuccessWithNames(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockSvc := mocks.NewMockRBSService(ctrl)
-	svc := NewControllerService(mockSvc)
+	svc := NewControllerService(mockSvc, kubeFakeClient)
 
 	ctx := context.Background()
 	req := &csi.CreateVolumeRequest{
@@ -111,7 +114,7 @@ func TestDeleteVolume_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockSvc := mocks.NewMockRBSService(ctrl)
-	svc := NewControllerService(mockSvc)
+	svc := NewControllerService(mockSvc, kubeFakeClient)
 	ctx := context.Background()
 
 	vol := &serverscom.RemoteBlockStorageVolume{
@@ -134,7 +137,7 @@ func TestDeleteVolume_NotFound(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockSvc := mocks.NewMockRBSService(ctrl)
-	svc := NewControllerService(mockSvc)
+	svc := NewControllerService(mockSvc, kubeFakeClient)
 	ctx := context.Background()
 
 	mockSvc.EXPECT().GetVolume(ctx, "vol-1").
@@ -152,7 +155,7 @@ func TestControllerPublishVolume_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockSvc := mocks.NewMockRBSService(ctrl)
-	svc := NewControllerService(mockSvc)
+	svc := NewControllerService(mockSvc, kubeFakeClient)
 	ctx := context.Background()
 
 	vol := &serverscom.RemoteBlockStorageVolume{ID: "vol-1"}
@@ -185,7 +188,7 @@ func TestControllerUnpublishVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	svc := NewControllerService(nil)
+	svc := NewControllerService(nil, nil)
 	ctx := context.Background()
 	req := &csi.ControllerUnpublishVolumeRequest{
 		VolumeId: "vol-1",
@@ -203,7 +206,7 @@ func TestControllerExpandVolume_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockSvc := mocks.NewMockRBSService(ctrl)
-	svc := NewControllerService(mockSvc)
+	svc := NewControllerService(mockSvc, kubeFakeClient)
 	ctx := context.Background()
 
 	vol := &serverscom.RemoteBlockStorageVolume{
@@ -236,7 +239,7 @@ func TestControllerExpandVolume_Success(t *testing.T) {
 
 func TestControllerGetCapabilities(t *testing.T) {
 	g := NewGomegaWithT(t)
-	svc := NewControllerService(nil)
+	svc := NewControllerService(nil, nil)
 	resp, err := svc.ControllerGetCapabilities(context.Background(), &csi.ControllerGetCapabilitiesRequest{})
 	g.Expect(err).To(BeNil())
 	g.Expect(resp.Capabilities).NotTo(BeEmpty())
@@ -244,7 +247,7 @@ func TestControllerGetCapabilities(t *testing.T) {
 
 func TestValidateVolumeCapabilities(t *testing.T) {
 	g := NewGomegaWithT(t)
-	svc := NewControllerService(nil)
+	svc := NewControllerService(nil, nil)
 	req := &csi.ValidateVolumeCapabilitiesRequest{
 		VolumeId: "vol-1",
 		VolumeCapabilities: []*csi.VolumeCapability{
