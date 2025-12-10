@@ -11,10 +11,21 @@ import (
 
 	"github.com/serverscom/rbs-csi-driver/pkg/mocks"
 	serverscom "github.com/serverscom/serverscom-go-client/pkg"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-var kubeFakeClient = fake.NewSimpleClientset()
+var (
+	testPvc = &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rbs-pvc-example",
+			Namespace: "default",
+		},
+	}
+
+	kubeFakeClient = fake.NewSimpleClientset(testPvc)
+)
 
 func TestCreateVolume_SuccessWithIDs(t *testing.T) {
 	g := NewGomegaWithT(t)
@@ -31,8 +42,10 @@ func TestCreateVolume_SuccessWithIDs(t *testing.T) {
 			RequiredBytes: 10 * 1024 * 1024 * 1024, // 10GB
 		},
 		Parameters: map[string]string{
-			"rbs.csi.servers.com/location": "1",
-			"rbs.csi.servers.com/flavor":   "2",
+			"rbs.csi.servers.com/location":     "1",
+			"rbs.csi.servers.com/flavor":       "2",
+			"csi.storage.k8s.io/pvc/name":      "rbs-pvc-example",
+			"csi.storage.k8s.io/pvc/namespace": "default",
 		},
 	}
 
@@ -75,8 +88,10 @@ func TestCreateVolume_SuccessWithNames(t *testing.T) {
 			RequiredBytes: 10 * 1024 * 1024 * 1024, // 10GB
 		},
 		Parameters: map[string]string{
-			"rbs.csi.servers.com/location": "test-location",
-			"rbs.csi.servers.com/flavor":   "test-flavor",
+			"rbs.csi.servers.com/location":     "test-location",
+			"rbs.csi.servers.com/flavor":       "test-flavor",
+			"csi.storage.k8s.io/pvc/name":      "rbs-pvc-example",
+			"csi.storage.k8s.io/pvc/namespace": "default",
 		},
 	}
 
