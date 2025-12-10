@@ -16,6 +16,7 @@ import (
 	"github.com/serverscom/rbs-csi-driver/pkg/rbs"
 	"github.com/serverscom/rbs-csi-driver/pkg/util"
 	serverscom "github.com/serverscom/serverscom-go-client/pkg"
+	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -33,12 +34,14 @@ const (
 type ControllerService struct {
 	csi.UnimplementedControllerServer
 	rbsService rbs.RBSService
+	kubeClient kubernetes.Interface
 }
 
 // NewControllerService creates a new controller service
-func NewControllerService(s rbs.RBSService) *ControllerService {
+func NewControllerService(s rbs.RBSService, kubeClient kubernetes.Interface) *ControllerService {
 	return &ControllerService{
 		rbsService: s,
+		kubeClient: kubeClient,
 	}
 }
 
@@ -80,7 +83,7 @@ func (s *ControllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 	)
 	// Build labels with priority order:
 	// 1. Labels from StorageClass parameters (rbs.csi.servers.com/labels)
-	// 2. Labels from PVC metadata (csi.storage.k8s.io/pvc/labels.*)
+	// 2. Labels from PVC metadata
 	// 3. System labels (rbs.csi.servers.com/pvc-uuid, pvc-namespace) - highest priority
 
 	labels := make(map[string]string)
@@ -89,9 +92,11 @@ func (s *ControllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 	storageClassLabels := s.getLabels(req.GetParameters())
 	maps.Copy(labels, storageClassLabels)
 
-	// 2. Get labels from PVC (passed by external-provisioner with --extra-create-metadata)
-	// They come as csi.storage.k8s.io/pvc/labels.<label-key> = <label-value>
-	pvcLabels := s.getPVCLabels(req.GetParameters())
+	// 2. Get labels from PVC
+	pvcLabels, err := s.getPVCLabels(ctx, pvcNamespace, pvcName)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get PVC labels: %v", err)
+	}
 	maps.Copy(labels, pvcLabels)
 
 	// 3. Add system labels (these override everything)

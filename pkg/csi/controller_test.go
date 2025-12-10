@@ -11,6 +11,20 @@ import (
 
 	"github.com/serverscom/rbs-csi-driver/pkg/mocks"
 	serverscom "github.com/serverscom/serverscom-go-client/pkg"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
+)
+
+var (
+	testPvc = &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rbs-pvc-example",
+			Namespace: "default",
+		},
+	}
+
+	kubeFakeClient = fake.NewSimpleClientset(testPvc)
 )
 
 func TestCreateVolume_SuccessWithIDs(t *testing.T) {
@@ -19,7 +33,7 @@ func TestCreateVolume_SuccessWithIDs(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockSvc := mocks.NewMockRBSService(ctrl)
-	svc := NewControllerService(mockSvc)
+	svc := NewControllerService(mockSvc, kubeFakeClient)
 
 	ctx := context.Background()
 	req := &csi.CreateVolumeRequest{
@@ -28,8 +42,10 @@ func TestCreateVolume_SuccessWithIDs(t *testing.T) {
 			RequiredBytes: 10 * 1024 * 1024 * 1024, // 10GB
 		},
 		Parameters: map[string]string{
-			"rbs.csi.servers.com/location": "1",
-			"rbs.csi.servers.com/flavor":   "2",
+			"rbs.csi.servers.com/location":     "1",
+			"rbs.csi.servers.com/flavor":       "2",
+			"csi.storage.k8s.io/pvc/name":      "rbs-pvc-example",
+			"csi.storage.k8s.io/pvc/namespace": "default",
 		},
 	}
 
@@ -63,7 +79,7 @@ func TestCreateVolume_SuccessWithNames(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockSvc := mocks.NewMockRBSService(ctrl)
-	svc := NewControllerService(mockSvc)
+	svc := NewControllerService(mockSvc, kubeFakeClient)
 
 	ctx := context.Background()
 	req := &csi.CreateVolumeRequest{
@@ -72,8 +88,10 @@ func TestCreateVolume_SuccessWithNames(t *testing.T) {
 			RequiredBytes: 10 * 1024 * 1024 * 1024, // 10GB
 		},
 		Parameters: map[string]string{
-			"rbs.csi.servers.com/location": "test-location",
-			"rbs.csi.servers.com/flavor":   "test-flavor",
+			"rbs.csi.servers.com/location":     "test-location",
+			"rbs.csi.servers.com/flavor":       "test-flavor",
+			"csi.storage.k8s.io/pvc/name":      "rbs-pvc-example",
+			"csi.storage.k8s.io/pvc/namespace": "default",
 		},
 	}
 
@@ -111,7 +129,7 @@ func TestDeleteVolume_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockSvc := mocks.NewMockRBSService(ctrl)
-	svc := NewControllerService(mockSvc)
+	svc := NewControllerService(mockSvc, kubeFakeClient)
 	ctx := context.Background()
 
 	vol := &serverscom.RemoteBlockStorageVolume{
@@ -134,7 +152,7 @@ func TestDeleteVolume_NotFound(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockSvc := mocks.NewMockRBSService(ctrl)
-	svc := NewControllerService(mockSvc)
+	svc := NewControllerService(mockSvc, kubeFakeClient)
 	ctx := context.Background()
 
 	mockSvc.EXPECT().GetVolume(ctx, "vol-1").
@@ -152,7 +170,7 @@ func TestControllerPublishVolume_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockSvc := mocks.NewMockRBSService(ctrl)
-	svc := NewControllerService(mockSvc)
+	svc := NewControllerService(mockSvc, kubeFakeClient)
 	ctx := context.Background()
 
 	vol := &serverscom.RemoteBlockStorageVolume{ID: "vol-1"}
@@ -185,7 +203,7 @@ func TestControllerUnpublishVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	svc := NewControllerService(nil)
+	svc := NewControllerService(nil, nil)
 	ctx := context.Background()
 	req := &csi.ControllerUnpublishVolumeRequest{
 		VolumeId: "vol-1",
@@ -203,7 +221,7 @@ func TestControllerExpandVolume_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockSvc := mocks.NewMockRBSService(ctrl)
-	svc := NewControllerService(mockSvc)
+	svc := NewControllerService(mockSvc, kubeFakeClient)
 	ctx := context.Background()
 
 	vol := &serverscom.RemoteBlockStorageVolume{
@@ -236,7 +254,7 @@ func TestControllerExpandVolume_Success(t *testing.T) {
 
 func TestControllerGetCapabilities(t *testing.T) {
 	g := NewGomegaWithT(t)
-	svc := NewControllerService(nil)
+	svc := NewControllerService(nil, nil)
 	resp, err := svc.ControllerGetCapabilities(context.Background(), &csi.ControllerGetCapabilitiesRequest{})
 	g.Expect(err).To(BeNil())
 	g.Expect(resp.Capabilities).NotTo(BeEmpty())
@@ -244,7 +262,7 @@ func TestControllerGetCapabilities(t *testing.T) {
 
 func TestValidateVolumeCapabilities(t *testing.T) {
 	g := NewGomegaWithT(t)
-	svc := NewControllerService(nil)
+	svc := NewControllerService(nil, nil)
 	req := &csi.ValidateVolumeCapabilitiesRequest{
 		VolumeId: "vol-1",
 		VolumeCapabilities: []*csi.VolumeCapability{

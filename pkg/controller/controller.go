@@ -15,6 +15,7 @@ import (
 	rbscsi "github.com/serverscom/rbs-csi-driver/pkg/csi"
 	"github.com/serverscom/rbs-csi-driver/pkg/rbs"
 	"github.com/serverscom/rbs-csi-driver/pkg/util"
+	"k8s.io/client-go/kubernetes"
 )
 
 // Controller represents the CSI Controller service
@@ -33,6 +34,7 @@ type Config struct {
 	Endpoint    string
 	RBSAPIUrl   string
 	RBSAPIToken string
+	KubeClient  *kubernetes.Clientset
 }
 
 // NewController creates a new CSI controller
@@ -42,7 +44,7 @@ func NewController(config *Config) (*Controller, error) {
 
 	// Create services
 	identityService := rbscsi.NewIdentityService()
-	controllerService := rbscsi.NewControllerService(rbsService)
+	controllerService := rbscsi.NewControllerService(rbsService, config.KubeClient)
 
 	controller := &Controller{
 		endpoint:          config.Endpoint,
