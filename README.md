@@ -68,9 +68,11 @@ Labels merge with priority: **System > PVC > StorageClass**
 Example:
 ```yaml
 # StorageClass labels
-metadata:
-  labels:
-    environment: production
+parameters:
+  rbs.csi.servers.com/labels: |
+    {
+      "managed-by": "kubernetes"
+    }
 
 ---
 # PVC labels
