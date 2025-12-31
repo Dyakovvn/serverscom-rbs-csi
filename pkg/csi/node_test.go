@@ -2,7 +2,10 @@ package csi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -221,7 +224,7 @@ func TestNodeUnstageVolume_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	svc, _, mmount := newTestNode(ctrl)
+	svc, iscsiMgr, mmount := newTestNode(ctrl)
 	ctx := context.Background()
 
 	req := &csi.NodeUnstageVolumeRequest{
@@ -230,16 +233,24 @@ func TestNodeUnstageVolume_Success(t *testing.T) {
 	}
 
 	mmount.EXPECT().IsMounted("/tmp/staging").Return(true, nil)
-	mmount.EXPECT().GetMountInfo("/tmp/staging").Return(&mount.MountInfo{
-		Device: "/dev/sdb",
-		FSType: "ext4",
-	}, nil)
 	mmount.EXPECT().Unmount(ctx, "/tmp/staging").Return(nil)
+
+	target := &iscsi.TargetInfo{
+		IQN:    "iqn.test",
+		Portal: "127.0.0.1:3260",
+	}
+	data, _ := json.Marshal(target)
+	_ = os.MkdirAll(req.StagingTargetPath, 0755)
+	_ = os.WriteFile(filepath.Join(req.StagingTargetPath, ".target-info"), data, 0600)
+
+	iscsiMgr.EXPECT().CleanupTarget(ctx, target).Return(nil)
 
 	resp, err := svc.NodeUnstageVolume(ctx, req)
 
 	g.Expect(err).To(BeNil())
 	g.Expect(resp).NotTo(BeNil())
+
+	_ = os.RemoveAll(req.StagingTargetPath)
 }
 
 func TestNodeUnstageVolume_NotMounted(t *testing.T) {
@@ -247,7 +258,7 @@ func TestNodeUnstageVolume_NotMounted(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	svc, _, mmount := newTestNode(ctrl)
+	svc, iscsiMgr, mmount := newTestNode(ctrl)
 	ctx := context.Background()
 
 	req := &csi.NodeUnstageVolumeRequest{
@@ -257,10 +268,21 @@ func TestNodeUnstageVolume_NotMounted(t *testing.T) {
 
 	mmount.EXPECT().IsMounted("/tmp/staging").Return(false, nil)
 
+	target := &iscsi.TargetInfo{
+		IQN:    "iqn.test",
+		Portal: "127.0.0.1:3260",
+	}
+	_ = os.MkdirAll(req.StagingTargetPath, 0755)
+	_ = os.WriteFile(filepath.Join(req.StagingTargetPath, ".target-info"), []byte(`{"IQN":"iqn.test","Portal":"127.0.0.1:3260"}`), 0600)
+
+	iscsiMgr.EXPECT().CleanupTarget(ctx, target).Return(nil)
+
 	resp, err := svc.NodeUnstageVolume(ctx, req)
 
 	g.Expect(err).To(BeNil())
 	g.Expect(resp).NotTo(BeNil())
+
+	_ = os.RemoveAll(req.StagingTargetPath)
 }
 
 func TestNodePublishVolume_Success(t *testing.T) {

@@ -4,13 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
+	"github.com/serverscom/rbs-csi-driver/pkg/iscsi"
 	serverscom "github.com/serverscom/serverscom-go-client/pkg"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 )
+
+const targetInfoFile = ".target-info"
 
 // getLocationID gets location ID from parameters, supporting both ID and name
 func (s *ControllerService) getLocationID(ctx context.Context, parameters map[string]string) (int, error) {
@@ -112,4 +117,39 @@ func (s *ControllerService) waitForVolumeActive(ctx context.Context, volumeID st
 		case <-time.After(pollInterval):
 		}
 	}
+}
+
+func targetInfoPath(stagingPath string) string {
+	return filepath.Join(stagingPath, targetInfoFile)
+}
+
+func SaveTargetInfo(stagingPath string, target *iscsi.TargetInfo) error {
+	data, err := json.Marshal(target)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(targetInfoPath(stagingPath), data, 0600)
+}
+
+func LoadTargetInfo(stagingPath string) (*iscsi.TargetInfo, error) {
+	data, err := os.ReadFile(targetInfoPath(stagingPath))
+	if err != nil {
+		return nil, err
+	}
+
+	var target iscsi.TargetInfo
+	if err := json.Unmarshal(data, &target); err != nil {
+		return nil, err
+	}
+
+	return &target, nil
+}
+
+func DeleteTargetInfo(stagingPath string) error {
+	err := os.Remove(targetInfoPath(stagingPath))
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }

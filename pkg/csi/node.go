@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -86,6 +85,11 @@ func (s *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 	klog.V(2).InfoS("Prepared iSCSI target", "portal", portal, "iqn", targetIQN)
 
+	if err := SaveTargetInfo(stagingPath, target); err != nil {
+		klog.ErrorS(err, "Failed to save target info")
+		return nil, status.Errorf(codes.Internal, "failed to save target info: %v", err)
+	}
+
 	// Check if already logged in
 	klog.V(2).InfoS("Checking iscsi login status")
 	loggedIn, err := s.iscsiManager.IsLoggedIn(ctx, target)
@@ -158,37 +162,33 @@ func (s *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	stagingPath := req.GetStagingTargetPath()
 
-	// Check if staging path is mounted
 	mounted, err := s.mountManager.IsMounted(stagingPath)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to check if staging path is mounted: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to check mount: %v", err)
 	}
 
 	if mounted {
-		// Get mount info to determine device
-		mountInfo, err := s.mountManager.GetMountInfo(stagingPath)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get mount info: %v", err)
-		}
-
-		// Unmount the staging path
-		klog.V(1).InfoS("Unmounting staging path", "staging_path", stagingPath)
+		klog.V(2).InfoS("Unmounting staging path", "staging_path", stagingPath)
 		if err := s.mountManager.Unmount(ctx, stagingPath); err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to unmount staging path: %v", err)
 		}
+	}
 
-		// Try to logout from iSCSI target
-		if strings.Contains(mountInfo.Device, "/dev/") {
-			klog.V(1).InfoS("Device unmounted", "device", mountInfo.Device)
+	// Load target info and cleanup iSCSI
+	target, err := LoadTargetInfo(stagingPath)
+	if err == nil {
+		if err := s.iscsiManager.CleanupTarget(ctx, target); err != nil {
+			return nil, status.Errorf(codes.Internal, "iscsi cleanup failed: %v", err)
 		}
 	}
 
-	// Remove staging directory
+	_ = DeleteTargetInfo(stagingPath)
+
 	if err := os.RemoveAll(stagingPath); err != nil {
-		klog.ErrorS(err, "Failed to remove staging directory")
+		klog.ErrorS(err, "Failed to remove staging directory", "path", stagingPath)
 	}
 
-	klog.InfoS("Volume unstaged successfully", "volume_id", req.GetVolumeId())
+	klog.V(1).InfoS("Volume unstaged successfully", "volume_id", req.GetVolumeId())
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
