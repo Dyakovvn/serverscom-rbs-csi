@@ -86,7 +86,8 @@ metadata:
 #   "pvc-uuid": "abc-123",
 #   "pvc-namespace": "default",
 #   "app": "database",
-#   "environment": "staging"
+#   "environment": "staging",
+#   "managed-by": "kubernetes"
 # }
 ```
 
