@@ -54,6 +54,7 @@ func main() {
 		RBSAPIUrl:   apiBaseURL,
 		RBSAPIToken: apiToken,
 		KubeClient:  kubeClient,
+		UserAgent:   "serverscom-rbs-csi/" + version,
 	}
 
 	ctrl, err := controller.NewController(config)

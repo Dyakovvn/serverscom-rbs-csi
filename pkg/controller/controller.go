@@ -34,12 +34,13 @@ type Config struct {
 	Endpoint    string
 	RBSAPIUrl   string
 	RBSAPIToken string
+	UserAgent   string
 	KubeClient  *kubernetes.Clientset
 }
 
 // NewController creates a new CSI controller
 func NewController(config *Config) (*Controller, error) {
-	scClient := util.NewScClient(config.RBSAPIUrl, config.RBSAPIToken)
+	scClient := util.NewScClient(config.RBSAPIUrl, config.RBSAPIToken, config.UserAgent)
 	rbsService := rbs.NewRBSService(scClient)
 
 	// Create services
