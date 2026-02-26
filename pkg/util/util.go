@@ -178,11 +178,16 @@ func ExtractPVCUUID(volumeHandle string) string {
 
 // NewScClient returns new client with specified url and token.
 // If baseUrl empty returns client with default baseUrl.
-func NewScClient(baseUrl, token string) *serverscom.Client {
+func NewScClient(baseUrl, token, ua string) *serverscom.Client {
 	if baseUrl == "" {
-		return serverscom.NewClient(token)
+		cli := serverscom.NewClient(token)
+		cli.SetupUserAgent(ua)
+		return cli
 	}
-	return serverscom.NewClientWithEndpoint(token, baseUrl)
+	cli := serverscom.NewClientWithEndpoint(token, baseUrl)
+	cli.SetupUserAgent(ua)
+
+	return cli
 }
 
 var sensitiveKeys = []string{
