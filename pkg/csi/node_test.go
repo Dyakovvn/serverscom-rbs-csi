@@ -68,6 +68,7 @@ func TestNodeStageVolume_Success(t *testing.T) {
 	miscsi.EXPECT().Login(ctx, target).Return(nil)
 	miscsi.EXPECT().GetDevice(ctx, target).Return("/dev/sdb", nil)
 	miscsi.EXPECT().WaitForDevice(ctx, "/dev/sdb", 30*time.Second).Return(nil)
+	mmount.EXPECT().IsMounted("/tmp/staging").Return(false, nil)
 	mmount.EXPECT().FormatAndMountDevice(ctx, "/dev/sdb", "/tmp/staging", "ext4", nil).Return(nil)
 
 	resp, err := svc.NodeStageVolume(ctx, req)
@@ -112,7 +113,53 @@ func TestNodeStageVolume_AlreadyLoggedIn(t *testing.T) {
 	miscsi.EXPECT().IsLoggedIn(ctx, target).Return(true, nil)
 	miscsi.EXPECT().GetDevice(ctx, target).Return("/dev/sdb", nil)
 	miscsi.EXPECT().WaitForDevice(ctx, "/dev/sdb", 30*time.Second).Return(nil)
+	mmount.EXPECT().IsMounted("/tmp/staging").Return(false, nil)
 	mmount.EXPECT().FormatAndMountDevice(ctx, "/dev/sdb", "/tmp/staging", "xfs", nil).Return(nil)
+
+	resp, err := svc.NodeStageVolume(ctx, req)
+
+	g.Expect(err).To(BeNil())
+	g.Expect(resp).NotTo(BeNil())
+}
+
+func TestNodeStageVolume_AlreadyStaged(t *testing.T) {
+	g := NewGomegaWithT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	svc, miscsi, mmount := newTestNode(ctrl)
+	ctx := context.Background()
+
+	req := &csi.NodeStageVolumeRequest{
+		VolumeId:          "vol-1",
+		StagingTargetPath: "/tmp/staging",
+		PublishContext: map[string]string{
+			"target-iqn": "iqn.2024-01.com.example:target",
+			"ip-address": "192.168.1.100",
+			"username":   "testuser",
+			"password":   "testpass",
+		},
+		VolumeCapability: &csi.VolumeCapability{
+			AccessType: &csi.VolumeCapability_Mount{
+				Mount: &csi.VolumeCapability_MountVolume{
+					FsType: "ext4",
+				},
+			},
+		},
+	}
+
+	target := &iscsi.TargetInfo{
+		Portal:   "192.168.1.100:3260",
+		IQN:      "iqn.2024-01.com.example:target",
+		Username: "testuser",
+		Password: "testpass",
+	}
+
+	miscsi.EXPECT().IsLoggedIn(ctx, target).Return(true, nil)
+	miscsi.EXPECT().GetDevice(ctx, target).Return("/dev/sdb", nil)
+	miscsi.EXPECT().WaitForDevice(ctx, "/dev/sdb", 30*time.Second).Return(nil)
+	mmount.EXPECT().IsMounted("/tmp/staging").Return(true, nil)
+	// FormatAndMountDevice must NOT be called for an already-staged volume
 
 	resp, err := svc.NodeStageVolume(ctx, req)
 
@@ -353,6 +400,31 @@ func TestNodePublishVolume_AlreadyMounted(t *testing.T) {
 
 	g.Expect(err).To(BeNil())
 	g.Expect(resp).NotTo(BeNil())
+}
+
+func TestNodePublishVolume_BindMountFails(t *testing.T) {
+	g := NewGomegaWithT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	svc, _, mmount := newTestNode(ctrl)
+	ctx := context.Background()
+
+	req := &csi.NodePublishVolumeRequest{
+		VolumeId:          "vol-1",
+		TargetPath:        "/tmp/target",
+		StagingTargetPath: "/tmp/staging",
+	}
+
+	mmount.EXPECT().IsMounted("/tmp/target").Return(false, nil)
+	mmount.EXPECT().BindMount(ctx, "/tmp/staging", "/tmp/target", []string{}).
+		Return(errors.New("already mounted"))
+
+	resp, err := svc.NodePublishVolume(ctx, req)
+
+	g.Expect(err).NotTo(BeNil())
+	g.Expect(resp).To(BeNil())
+	g.Expect(status.Code(err)).To(Equal(codes.Internal))
 }
 
 func TestNodeUnpublishVolume_Success(t *testing.T) {
