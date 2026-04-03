@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -24,6 +25,7 @@ type NodeService struct {
 	nodeID       string
 	iscsiManager iscsi.ISCSIManager
 	mountManager mount.MountManager
+	stagingMu    sync.Map // map[volumeID → *sync.Mutex], serializes concurrent stage calls per volume
 }
 
 // NewNodeService creates a new node service
@@ -38,6 +40,15 @@ func NewNodeService(nodeID string) *NodeService {
 // NodeStageVolume stages a volume to the staging path
 func (s *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	klog.V(2).InfoS("NodeStageVolume called", "volume_id", req.GetVolumeId())
+
+	// Serialize concurrent staging calls for the same volume. Kubelet may retry
+	// NodeStageVolume while a previous call is still formatting the disk (mkfs can
+	// take minutes). Without this lock the second call races FormatAndMountDevice
+	// and hits "already mounted" once the first call finishes.
+	mu, _ := s.stagingMu.LoadOrStore(req.GetVolumeId(), &sync.Mutex{})
+	lock := mu.(*sync.Mutex)
+	lock.Lock()
+	defer lock.Unlock()
 
 	// Extract iSCSI connection information from publish context
 	publishContext := req.GetPublishContext()
@@ -140,6 +151,16 @@ func (s *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		if mount := cap.GetMount(); mount != nil && mount.GetFsType() != "" {
 			fsType = mount.GetFsType()
 		}
+	}
+
+	mounted, err := s.mountManager.IsMounted(stagingPath)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to check if staging path is mounted: %v", err)
+	}
+	if mounted {
+		klog.V(1).InfoS("Staging path already mounted, volume already staged",
+			"volume_id", req.GetVolumeId(), "staging_path", stagingPath)
+		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
 	// Use FormatAndMount which will check if already formatted and only format if needed
