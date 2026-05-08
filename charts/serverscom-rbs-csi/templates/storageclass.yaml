@@ -1,0 +1,37 @@
+{{- $defaults := 0 -}}
+{{- range .Values.storageClasses -}}
+  {{- if .isDefault }}{{ $defaults = add $defaults 1 }}{{ end -}}
+{{- end -}}
+{{- if gt $defaults 1 -}}
+{{- fail "storageClasses: only one entry may have isDefault: true" -}}
+{{- end -}}
+{{- range $idx, $sc := .Values.storageClasses }}
+{{- include "rbs-csi.validateFsType" $sc.fsType -}}
+{{- if $idx }}
+---
+{{- end }}
+{{- $name := $sc.name | default (printf "sc-rbs-%s-%s" ($sc.flavor | toString | lower) ($sc.location | toString | lower)) }}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "rbs-csi.labels" $ | nindent 4 }}
+    {{- with $sc.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  annotations:
+    storageclass.kubernetes.io/is-default-class: {{ $sc.isDefault | default false | ternary "true" "false" | quote }}
+provisioner: rbs.csi.servers.com
+parameters:
+  rbs.csi.servers.com/location: {{ $sc.location | quote }}
+  rbs.csi.servers.com/flavor: {{ $sc.flavor | quote }}
+  {{- with $sc.volumeLabels }}
+  rbs.csi.servers.com/labels: {{ toJson . | quote }}
+  {{- end }}
+  {{- with $sc.fsType }}
+  fstype: {{ . | quote }}
+  {{- end }}
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+{{- end }}

@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: rbs-csi-node
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: rbs-csi-node
+    {{- include "rbs-csi.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: rbs-csi-node
+  template:
+    metadata:
+      labels:
+        app: rbs-csi-node
+        {{- include "rbs-csi.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: rbs-csi-node-sa
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.node.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: node-driver-registrar
+          image: "{{ .Values.node.nodeDriverRegistrar.image.repository }}:{{ .Values.node.nodeDriverRegistrar.image.tag }}"
+          args:
+            - "--v=2"
+            - "--csi-address=$(ADDRESS)"
+            - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/kubelet/plugins/rbs.csi.servers.com/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi/
+            - name: registration-dir
+              mountPath: /registration/
+          {{- with .Values.node.nodeDriverRegistrar.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+        - name: rbs-csi-driver
+          image: "{{ .Values.node.driver.image.repository }}:{{ .Values.node.driver.image.tag }}"
+          imagePullPolicy: {{ .Values.node.driver.image.pullPolicy }}
+          command: ["/bin/rbs-csi-node"]
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+          args:
+            - "--endpoint=$(RBS_CSI_ENDPOINT)"
+            - "--nodeid=$(RBS_CSI_NODE_ID)"
+          env:
+            - name: RBS_CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+            - name: RBS_CSI_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi
+            - name: kubelet-dir
+              mountPath: /var/lib/kubelet
+              mountPropagation: Bidirectional
+            - name: device-dir
+              mountPath: /dev
+            - name: iscsi-dir
+              mountPath: /etc/iscsi
+            - name: iscsi-run
+              mountPath: /run
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+          {{- with .Values.node.driver.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+      volumes:
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry/
+            type: DirectoryOrCreate
+        - name: plugin-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/rbs.csi.servers.com/
+            type: DirectoryOrCreate
+        - name: kubelet-dir
+          hostPath:
+            path: /var/lib/kubelet
+            type: Directory
+        - name: device-dir
+          hostPath:
+            path: /dev
+        - name: iscsi-dir
+          hostPath:
+            path: /etc/iscsi
+        - name: iscsi-run
+          hostPath:
+            path: /run
+            type: Directory
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+            type: Directory
