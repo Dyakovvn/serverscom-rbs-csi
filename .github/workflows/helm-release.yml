@@ -21,19 +21,13 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
-      - name: Pin chart and image versions to tag
+      - name: Pin chart version to tag
         env:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          # Tag scheme: helm-vX.Y.Z -> chart version X.Y.Z, image tag vX.Y.Z
-          # (the image tag must already be published by the goreleaser workflow).
           VERSION="${TAG#helm-v}"
-          IMAGE_TAG="v${VERSION}"
-          yq -i ".version = \"${VERSION}\" | .appVersion = \"${IMAGE_TAG}\"" \
-            charts/serverscom-rbs-csi/Chart.yaml
-          yq -i ".controller.driver.image.tag = \"${IMAGE_TAG}\" | .node.driver.image.tag = \"${IMAGE_TAG}\"" \
-            charts/serverscom-rbs-csi/values.yaml
+          yq -i ".version = \"${VERSION}\"" charts/serverscom-rbs-csi/Chart.yaml
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
