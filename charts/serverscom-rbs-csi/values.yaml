@@ -17,7 +17,7 @@ controller:
   driver:
     image:
       repository: ghcr.io/serverscom/rbs-csi-driver
-      tag: v0.1.4
+      tag: ""
       pullPolicy: Always
     resources:
       limits:
@@ -45,7 +45,7 @@ node:
   driver:
     image:
       repository: ghcr.io/serverscom/rbs-csi-driver
-      tag: v0.1.4
+      tag: ""
       pullPolicy: Always
     resources:
       limits:

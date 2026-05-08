@@ -54,7 +54,7 @@ spec:
           {{- end }}
 
         - name: rbs-csi-driver
-          image: "{{ .Values.node.driver.image.repository }}:{{ .Values.node.driver.image.tag }}"
+          image: "{{ .Values.node.driver.image.repository }}:{{ .Values.node.driver.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.node.driver.image.pullPolicy }}
           command: ["/bin/rbs-csi-node"]
           securityContext:

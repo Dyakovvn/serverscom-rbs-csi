@@ -72,7 +72,7 @@ spec:
               mountPath: /var/lib/csi/sockets/pluginproxy/
 
         - name: rbs-csi-driver
-          image: "{{ .Values.controller.driver.image.repository }}:{{ .Values.controller.driver.image.tag }}"
+          image: "{{ .Values.controller.driver.image.repository }}:{{ .Values.controller.driver.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.controller.driver.image.pullPolicy }}
           command: ["/bin/rbs-csi-controller"]
           args:
