@@ -1,0 +1,28 @@
+---
+name: helm-chart-test
+
+on:
+  pull_request:
+    paths:
+      - charts/serverscom-rbs-csi/**
+      - scripts/helm-render.sh
+      - .github/workflows/helm-chart-test.yml
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+
+      - name: Lint Helm Chart
+        run: helm lint ./charts/serverscom-rbs-csi --set api.token=dummy
+
+      - name: Template Helm Chart
+        run: |
+          helm template rbs-csi ./charts/serverscom-rbs-csi \
+            --namespace kube-system \
+            --set api.token=dummy > /dev/null

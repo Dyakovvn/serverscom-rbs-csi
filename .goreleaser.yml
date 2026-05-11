@@ -4,7 +4,6 @@ version: 2
 before:
   hooks:
     - go mod tidy
-    - ./scripts/build-deploy-manifest.sh {{ .Version }}
 
 builds:
   - id: controller
@@ -60,5 +59,3 @@ docker_manifests:
 
 release:
   draft: true
-  extra_files:
-    - glob: "rbs-csi-deploy.yaml"
