@@ -32,6 +32,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve IMAGE_REPO
+        run: |
+          OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_REPO=ghcr.io/${OWNER}/rbs-csi-driver" >> "$GITHUB_ENV"
       - name: Run GoReleaser for tag
         if: "startsWith(github.ref, 'refs/tags/')"
         uses: goreleaser/goreleaser-action@v6
@@ -41,6 +45,7 @@ jobs:
         env:
           GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_REPO: ${{ env.IMAGE_REPO }}
       - name: Clear
         if: always()
         run: rm -f ${HOME}/.docker/config.json
@@ -60,6 +65,11 @@ jobs:
       - name: Set up kind cluster
         uses: helm/kind-action@v1
 
+      - name: Resolve IMAGE_REPO
+        run: |
+          OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_REPO=ghcr.io/${OWNER}/rbs-csi-driver" >> "$GITHUB_ENV"
+
       - name: Template Helm Chart
         env:
           TAG: ${{ github.ref_name }}
@@ -67,6 +77,8 @@ jobs:
           helm template rbs-csi ./charts/serverscom-rbs-csi \
             --namespace kube-system \
             --set api.token=dummy \
+            --set-string controller.driver.image.repository="${IMAGE_REPO}" \
+            --set-string node.driver.image.repository="${IMAGE_REPO}" \
             --set-string controller.driver.image.tag="${TAG}" \
             --set-string node.driver.image.tag="${TAG}" \
             > rbs-csi.yaml
