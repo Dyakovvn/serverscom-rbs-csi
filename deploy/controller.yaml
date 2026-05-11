@@ -1,3 +1,5 @@
+---
+# Source: serverscom-rbs-csi/templates/controller.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -5,6 +7,7 @@ metadata:
   namespace: kube-system
   labels:
     app: rbs-csi-controller
+    app.kubernetes.io/name: serverscom-rbs-csi
 spec:
   replicas: 1
   selector:
@@ -14,60 +17,62 @@ spec:
     metadata:
       labels:
         app: rbs-csi-controller
+        app.kubernetes.io/name: serverscom-rbs-csi
     spec:
       serviceAccountName: rbs-csi-controller-sa
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
       containers:
         - name: csi-provisioner
           image: registry.k8s.io/sig-storage/csi-provisioner:v5.3.0
           args:
-            - "--csi-address=$(ADDRESS)"
-            - "--v=2"
-            - "--leader-election"
-            - "--timeout=10m"
-            - "--extra-create-metadata"
-            - "--feature-gates=Topology=false"
+            - --csi-address=$(ADDRESS)
+            - --v=2
+            - --leader-election
+            - --timeout=10m
+            - --extra-create-metadata
+            - --feature-gates=Topology=false
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
-
         - name: csi-attacher
           image: registry.k8s.io/sig-storage/csi-attacher:v4.10.0
           args:
-            - "--v=2"
-            - "--csi-address=$(ADDRESS)"
-            - "--leader-election"
+            - --v=2
+            - --csi-address=$(ADDRESS)
+            - --leader-election
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
-
         - name: csi-resizer
           image: registry.k8s.io/sig-storage/csi-resizer:v2.0.0
           args:
-            - "--csi-address=$(ADDRESS)"
-            - "--v=2"
-            - "--leader-election"
+            - --csi-address=$(ADDRESS)
+            - --v=2
+            - --leader-election
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
-
         - name: rbs-csi-driver
-          image: ghcr.io/serverscom/rbs-csi-driver:{{VERSION}}
-          command: ["/bin/rbs-csi-controller"]
+          image: ghcr.io/serverscom/rbs-csi-driver:v0.1.4
           imagePullPolicy: Always
+          command:
+            - /bin/rbs-csi-controller
           args:
-            - "--endpoint=$(CSI_ENDPOINT)"
-            - "--v=2"
+            - --endpoint=$(CSI_ENDPOINT)
+            - --v=2
           env:
             - name: CSI_ENDPOINT
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
@@ -86,12 +91,11 @@ spec:
               mountPath: /var/lib/csi/sockets/pluginproxy/
           resources:
             limits:
-              memory: "200Mi"
-              cpu: "100m"
+              cpu: 100m
+              memory: 200Mi
             requests:
-              memory: "100Mi"
-              cpu: "50m"
-
+              cpu: 50m
+              memory: 100Mi
       volumes:
         - name: socket-dir
           emptyDir: {}

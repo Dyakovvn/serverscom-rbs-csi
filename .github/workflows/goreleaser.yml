@@ -38,3 +38,11 @@ jobs:
       - name: Clear
         if: always()
         run: rm -f ${HOME}/.docker/config.json
+      - name: Bump chart appVersion
+        run: |
+          yq -i ".appVersion = \"${{ github.ref_name }}\"" charts/serverscom-rbs-csi/Chart.yaml
+          bash hack/render-deploy.sh
+      - uses: peter-evans/create-pull-request@v6
+        with:
+          title: "chore: bump appVersion to ${{ github.ref_name }}"
+          branch: bump/${{ github.ref_name }}

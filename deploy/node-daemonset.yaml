@@ -1,3 +1,5 @@
+---
+# Source: serverscom-rbs-csi/templates/node-daemonset.yaml
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -5,6 +7,7 @@ metadata:
   namespace: kube-system
   labels:
     app: rbs-csi-node
+    app.kubernetes.io/name: serverscom-rbs-csi
 spec:
   selector:
     matchLabels:
@@ -13,17 +16,20 @@ spec:
     metadata:
       labels:
         app: rbs-csi-node
+        app.kubernetes.io/name: serverscom-rbs-csi
     spec:
       serviceAccountName: rbs-csi-node-sa
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      tolerations:
+        - operator: Exists
       containers:
         - name: node-driver-registrar
           image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0
           args:
-            - "--v=2"
-            - "--csi-address=$(ADDRESS)"
-            - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
+            - --v=2
+            - --csi-address=$(ADDRESS)
+            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
           env:
             - name: ADDRESS
               value: /csi/csi.sock
@@ -40,23 +46,25 @@ spec:
               mountPath: /registration/
           resources:
             limits:
-              memory: "100Mi"
-              cpu: "50m"
+              cpu: 50m
+              memory: 100Mi
             requests:
-              memory: "50Mi"
-              cpu: "10m"
-
+              cpu: 10m
+              memory: 50Mi
         - name: rbs-csi-driver
-          image: ghcr.io/serverscom/rbs-csi-driver:{{VERSION}}
-          command: ["/bin/rbs-csi-node"]
+          image: ghcr.io/serverscom/rbs-csi-driver:v0.1.4
           imagePullPolicy: Always
+          command:
+            - /bin/rbs-csi-node
           securityContext:
             privileged: true
             capabilities:
-              add: ["SYS_ADMIN"]
+              add:
+                - SYS_ADMIN
+            allowPrivilegeEscalation: true
           args:
-            - "--endpoint=$(RBS_CSI_ENDPOINT)"
-            - "--nodeid=$(RBS_CSI_NODE_ID)"
+            - --endpoint=$(RBS_CSI_ENDPOINT)
+            - --nodeid=$(RBS_CSI_NODE_ID)
           env:
             - name: RBS_CSI_ENDPOINT
               value: unix:///csi/csi.sock
@@ -64,17 +72,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          securityContext:
-            privileged: true
-            capabilities:
-              add: ["SYS_ADMIN"]
-            allowPrivilegeEscalation: true
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi
             - name: kubelet-dir
               mountPath: /var/lib/kubelet
-              mountPropagation: "Bidirectional"
+              mountPropagation: Bidirectional
             - name: device-dir
               mountPath: /dev
             - name: iscsi-dir
@@ -86,12 +89,11 @@ spec:
               readOnly: true
           resources:
             limits:
-              memory: "200Mi"
-              cpu: "100m"
+              cpu: 100m
+              memory: 200Mi
             requests:
-              memory: "100Mi"
-              cpu: "50m"
-
+              cpu: 50m
+              memory: 100Mi
       volumes:
         - name: registration-dir
           hostPath:
