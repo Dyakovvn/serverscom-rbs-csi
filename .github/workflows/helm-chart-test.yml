@@ -1,12 +1,12 @@
 ---
-name: chart-test
+name: helm-chart-test
 
 on:
   pull_request:
     paths:
       - charts/serverscom-rbs-csi/**
       - scripts/helm-render.sh
-      - .github/workflows/deploy-in-sync.yml
+      - .github/workflows/helm-chart-test.yml
 
 jobs:
   lint:
