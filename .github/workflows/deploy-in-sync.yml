@@ -1,19 +1,15 @@
-name: deploy-in-sync
+---
+name: chart-test
 
-# Ensures deploy/*.yaml is the verbatim output of hack/render-deploy.sh.
-# The Helm chart is the source of truth; deploy/ is a generated artifact.
 on:
   pull_request:
     paths:
       - charts/serverscom-rbs-csi/**
-      - deploy/**
-      - hack/render-deploy.sh
+      - scripts/helm-render.sh
       - .github/workflows/deploy-in-sync.yml
-  push:
-    branches: [main]
 
 jobs:
-  check:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,19 +18,11 @@ jobs:
         with:
           version: v3.17.3
 
-      - name: Install yq
-        run: |
-          sudo curl -fsSL -o /usr/local/bin/yq \
-            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
+      - name: Lint Helm Chart
+        run: helm lint ./charts/serverscom-rbs-csi --set api.token=dummy
 
-      - name: Render deploy/ from chart
-        run: bash hack/render-deploy.sh
-
-      - name: Fail if deploy/ drifted from chart
+      - name: Template Helm Chart
         run: |
-          if ! git diff --exit-code deploy/; then
-            echo "::error::deploy/ is out of sync with charts/serverscom-rbs-csi."
-            echo "::error::Run 'bash hack/render-deploy.sh' locally and commit the result."
-            exit 1
-          fi
+          helm template rbs-csi ./charts/serverscom-rbs-csi \
+            --namespace kube-system \
+            --set api.token=dummy > /dev/null

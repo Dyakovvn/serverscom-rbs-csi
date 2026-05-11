@@ -44,6 +44,10 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
+          {{- with .Values.controller.provisioner.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 
         - name: csi-attacher
           image: "{{ .Values.controller.attacher.image.repository }}:{{ .Values.controller.attacher.image.tag }}"
@@ -57,6 +61,10 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
+          {{- with .Values.controller.attacher.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 
         - name: csi-resizer
           image: "{{ .Values.controller.resizer.image.repository }}:{{ .Values.controller.resizer.image.tag }}"
@@ -70,6 +78,10 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
+          {{- with .Values.controller.resizer.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 
         - name: rbs-csi-driver
           image: "{{ .Values.controller.driver.image.repository }}:{{ .Values.controller.driver.image.tag | default .Chart.AppVersion }}"

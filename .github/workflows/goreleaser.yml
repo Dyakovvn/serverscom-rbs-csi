@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - v*
+
+permissions:
+  contents: write
+  packages: write
+  pages: write
+
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
@@ -38,11 +44,93 @@ jobs:
       - name: Clear
         if: always()
         run: rm -f ${HOME}/.docker/config.json
-      - name: Bump chart appVersion
-        run: |
-          yq -i ".appVersion = \"${{ github.ref_name }}\"" charts/serverscom-rbs-csi/Chart.yaml
-          bash hack/render-deploy.sh
-      - uses: peter-evans/create-pull-request@v6
+
+  kind-test:
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-kubectl@v4
+
+      - uses: azure/setup-helm@v4
         with:
-          title: "chore: bump appVersion to ${{ github.ref_name }}"
-          branch: bump/${{ github.ref_name }}
+          version: v3.17.3
+
+      - name: Set up kind cluster
+        uses: helm/kind-action@v1
+
+      - name: Template Helm Chart
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          helm template rbs-csi ./charts/serverscom-rbs-csi \
+            --namespace kube-system \
+            --set api.token=dummy \
+            --set-string controller.driver.image.tag="${TAG}" \
+            --set-string node.driver.image.tag="${TAG}" \
+            > rbs-csi.yaml
+
+      - name: Verify deployment
+        run: |
+          kubectl apply --namespace kube-system -f rbs-csi.yaml
+          kubectl wait --namespace kube-system \
+            pod -l app=rbs-csi-controller \
+            --for=condition=Ready --timeout=300s
+          kubectl wait --namespace kube-system \
+            pod -l app=rbs-csi-node \
+            --for=condition=Ready --timeout=300s
+
+  chart-release:
+    needs: kind-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Install yq
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+
+      - name: Pin chart version to tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          yq -i ".version = \"${VERSION}\" | .appVersion = \"${TAG}\"" \
+            charts/serverscom-rbs-csi/Chart.yaml
+
+      - name: Render deploy manifest
+        env:
+          TAG: ${{ github.ref_name }}
+        run: bash scripts/helm-render.sh --image-tag "${TAG}" --output rbs-csi-deploy.yaml
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.7.0
+        with:
+          charts_dir: charts
+          mark_as_latest: true
+          skip_existing: true
+        env:
+          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload deploy manifest to app release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: gh release upload "${TAG}" rbs-csi-deploy.yaml --clobber
