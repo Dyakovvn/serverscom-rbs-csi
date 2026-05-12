@@ -1,0 +1,8 @@
+apiVersion: v2
+name: serverscom-rbs-csi
+description: Servers.com RBS CSI driver
+type: application
+version: 0.0.0
+appVersion: "v0.0.0"
+maintainers:
+  - name: Servers.com team
