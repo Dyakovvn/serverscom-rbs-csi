@@ -2,9 +2,10 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: rbs-csi-node
-  namespace: kube-system
+  namespace: {{ .Release.Namespace }}
   labels:
     app: rbs-csi-node
+    {{- include "rbs-csi.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
@@ -13,13 +14,22 @@ spec:
     metadata:
       labels:
         app: rbs-csi-node
+        {{- include "rbs-csi.labels" . | nindent 8 }}
     spec:
       serviceAccountName: rbs-csi-node-sa
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.node.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: node-driver-registrar
-          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0
+          image: "{{ .Values.node.nodeDriverRegistrar.image.repository }}:{{ .Values.node.nodeDriverRegistrar.image.tag }}"
           args:
             - "--v=2"
             - "--csi-address=$(ADDRESS)"
@@ -38,22 +48,20 @@ spec:
               mountPath: /csi/
             - name: registration-dir
               mountPath: /registration/
+          {{- with .Values.node.nodeDriverRegistrar.resources }}
           resources:
-            limits:
-              memory: "100Mi"
-              cpu: "50m"
-            requests:
-              memory: "50Mi"
-              cpu: "10m"
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 
         - name: rbs-csi-driver
-          image: ghcr.io/serverscom/rbs-csi-driver:{{VERSION}}
+          image: "{{ .Values.node.driver.image.repository }}:{{ .Values.node.driver.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.node.driver.image.pullPolicy }}
           command: ["/bin/rbs-csi-node"]
-          imagePullPolicy: Always
           securityContext:
             privileged: true
             capabilities:
               add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
           args:
             - "--endpoint=$(RBS_CSI_ENDPOINT)"
             - "--nodeid=$(RBS_CSI_NODE_ID)"
@@ -64,17 +72,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          securityContext:
-            privileged: true
-            capabilities:
-              add: ["SYS_ADMIN"]
-            allowPrivilegeEscalation: true
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi
             - name: kubelet-dir
               mountPath: /var/lib/kubelet
-              mountPropagation: "Bidirectional"
+              mountPropagation: Bidirectional
             - name: device-dir
               mountPath: /dev
             - name: iscsi-dir
@@ -84,13 +87,10 @@ spec:
             - name: lib-modules
               mountPath: /lib/modules
               readOnly: true
+          {{- with .Values.node.driver.resources }}
           resources:
-            limits:
-              memory: "200Mi"
-              cpu: "100m"
-            requests:
-              memory: "100Mi"
-              cpu: "50m"
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 
       volumes:
         - name: registration-dir
