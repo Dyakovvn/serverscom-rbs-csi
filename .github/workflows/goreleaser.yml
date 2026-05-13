@@ -137,8 +137,8 @@ jobs:
         env:
           CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload deploy manifest to app release
+      - name: Upload deploy manifest to chart release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
-        run: gh release upload "${TAG}" rbs-csi-deploy.yaml --clobber
+        run: gh release upload "serverscom-rbs-csi-${TAG#v}" rbs-csi-deploy.yaml --clobber
