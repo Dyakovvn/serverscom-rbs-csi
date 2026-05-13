@@ -26,6 +26,18 @@ entries:
     - https://github.com/Dyakovvn/serverscom-rbs-csi/releases/download/serverscom-rbs-csi-0.1.6/serverscom-rbs-csi-0.1.6.tgz
     version: 0.1.6
   - apiVersion: v2
+    appVersion: v0.0.3-test
+    created: "2026-05-13T07:53:01.130435284Z"
+    description: Servers.com RBS CSI driver
+    digest: 133918c5ebad2d495b69786d95a13019be1d06d7a682178ec7788b5908131126
+    maintainers:
+    - name: Servers.com team
+    name: serverscom-rbs-csi
+    type: application
+    urls:
+    - https://github.com/Dyakovvn/serverscom-rbs-csi/releases/download/serverscom-rbs-csi-0.0.3-test/serverscom-rbs-csi-0.0.3-test.tgz
+    version: 0.0.3-test
+  - apiVersion: v2
     appVersion: v0.0.2-test
     created: "2026-05-12T15:14:38.114120181Z"
     description: Servers.com RBS CSI driver
@@ -49,4 +61,4 @@ entries:
     urls:
     - https://github.com/Dyakovvn/serverscom-rbs-csi/releases/download/serverscom-rbs-csi-0.0.1-test/serverscom-rbs-csi-0.0.1-test.tgz
     version: 0.0.1-test
-generated: "2026-05-12T15:14:38.114135624Z"
+generated: "2026-05-13T07:53:01.130455Z"
