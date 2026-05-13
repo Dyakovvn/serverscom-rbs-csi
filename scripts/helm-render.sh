@@ -11,23 +11,11 @@ OUTPUT="${ROOT}/rbs-csi-deploy.yaml"
 TMP="$(mktemp -d "${RUNNER_TEMP:-$HOME}/render-deploy.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
-cat > "$TMP/values.yaml" <<'EOF'
-api:
-  token: "deploy-api-token-example"
-EOF
-
-SET_ARGS=()
-if [[ -n "$TAG" ]]; then
-  SET_ARGS=(
-    --set-string "controller.driver.image.tag=${TAG}"
-    --set-string "node.driver.image.tag=${TAG}"
-  )
-fi
-
 helm template rbs-csi "$CHART" \
   --namespace kube-system \
-  -f "$TMP/values.yaml" \
-  "${SET_ARGS[@]}" \
+  --set-string "controller.driver.image.tag=${TAG}" \
+  --set-string "node.driver.image.tag=${TAG}" \
+  --set-string "api.token=deploy-api-token-example" \
   --output-dir "$TMP/rendered" >/dev/null
 
 SRC="$TMP/rendered/serverscom-rbs-csi/templates"
