@@ -2,6 +2,8 @@ apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
   name: rbs.csi.servers.com
+  labels:
+    {{- include "rbs-csi.labels" . | nindent 4 }}
 spec:
   attachRequired: true
   podInfoOnMount: false

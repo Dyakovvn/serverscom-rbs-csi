@@ -15,6 +15,21 @@ Kubernetes CSI driver for Remote Block Storage (RBS) - dynamic provisioning and 
 
 ## Quick Start
 
+### Install with Helm
+
+```bash
+helm repo add serverscom https://serverscom.github.io/serverscom-rbs-csi
+helm repo update
+
+helm install rbs-csi serverscom/serverscom-rbs-csi \
+  --namespace kube-system \
+  --set api.token=YOUR_API_TOKEN \
+  --set storageClasses[0].flavor=Performance \
+  --set storageClasses[0].location=AMS7
+```
+
+### Install with Raw manifests
+
 ```bash
 # 1. Create credentials secret
 kubectl create secret generic rbs-csi-secret \
@@ -51,7 +66,7 @@ parameters:
   rbs.csi.servers.com/location: "40"
   rbs.csi.servers.com/flavor: "16997"
   # names for location and flavor also supported
-  # rbs.csi.servers.com/flavor: "SSD-High" 
+  # rbs.csi.servers.com/flavor: "SSD-High"
   # rbs.csi.servers.com/location: "AMS1"
   rbs.csi.servers.com/labels: |
     {
@@ -66,6 +81,7 @@ volumeBindingMode: WaitForFirstConsumer
 Labels merge with priority: **System > PVC > StorageClass**
 
 Example:
+
 ```yaml
 # StorageClass labels
 parameters:
@@ -94,10 +110,12 @@ metadata:
 ## Architecture
 
 **CSI Controller** (Deployment):
+
 - CreateVolume, DeleteVolume, ExpandVolume
 - RBS API integration
 
 **CSI Node** (DaemonSet):
+
 - StageVolume, UnstageVolume
 - iSCSI discovery and login
 - Filesystem formatting and mounting

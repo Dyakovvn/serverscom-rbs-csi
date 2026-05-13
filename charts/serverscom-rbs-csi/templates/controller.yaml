@@ -2,9 +2,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: rbs-csi-controller
-  namespace: kube-system
+  namespace: {{ .Release.Namespace }}
   labels:
     app: rbs-csi-controller
+    {{- include "rbs-csi.labels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
@@ -14,13 +15,22 @@ spec:
     metadata:
       labels:
         app: rbs-csi-controller
+        {{- include "rbs-csi.labels" . | nindent 8 }}
     spec:
       serviceAccountName: rbs-csi-controller-sa
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controller.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v5.3.0
+          image: "{{ .Values.controller.provisioner.image.repository }}:{{ .Values.controller.provisioner.image.tag }}"
           args:
             - "--csi-address=$(ADDRESS)"
             - "--v=2"
@@ -34,9 +44,13 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
+          {{- with .Values.controller.provisioner.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 
         - name: csi-attacher
-          image: registry.k8s.io/sig-storage/csi-attacher:v4.10.0
+          image: "{{ .Values.controller.attacher.image.repository }}:{{ .Values.controller.attacher.image.tag }}"
           args:
             - "--v=2"
             - "--csi-address=$(ADDRESS)"
@@ -47,9 +61,13 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
+          {{- with .Values.controller.attacher.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 
         - name: csi-resizer
-          image: registry.k8s.io/sig-storage/csi-resizer:v2.0.0
+          image: "{{ .Values.controller.resizer.image.repository }}:{{ .Values.controller.resizer.image.tag }}"
           args:
             - "--csi-address=$(ADDRESS)"
             - "--v=2"
@@ -60,11 +78,15 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
+          {{- with .Values.controller.resizer.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 
         - name: rbs-csi-driver
-          image: ghcr.io/serverscom/rbs-csi-driver:{{VERSION}}
+          image: "{{ .Values.controller.driver.image.repository }}:{{ .Values.controller.driver.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.controller.driver.image.pullPolicy }}
           command: ["/bin/rbs-csi-controller"]
-          imagePullPolicy: Always
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--v=2"
@@ -84,13 +106,10 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
+          {{- with .Values.controller.driver.resources }}
           resources:
-            limits:
-              memory: "200Mi"
-              cpu: "100m"
-            requests:
-              memory: "100Mi"
-              cpu: "50m"
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 
       volumes:
         - name: socket-dir
