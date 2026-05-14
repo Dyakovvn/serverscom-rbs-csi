@@ -115,27 +115,30 @@ jobs:
         with:
           version: v3.17.3
 
+      - name: Resolve release variables
+        run: |
+          echo "TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+          echo "CHART_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
       - name: Pin chart version to tag
-        env:
-          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          VERSION="${TAG#v}"
-          yq -i ".version = \"${VERSION}\" | .appVersion = \"${TAG}\"" charts/serverscom-rbs-csi/Chart.yaml
+          yq -i ".version = \"${CHART_VERSION}\" | .appVersion = \"${TAG}\"" charts/serverscom-rbs-csi/Chart.yaml
 
       - name: Render deploy manifest
-        env:
-          TAG: ${{ github.ref_name }}
         run: bash scripts/helm-render.sh
 
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.7.0
-        with:
-          charts_dir: charts
-          mark_as_latest: true
-          skip_existing: true
-        env:
-          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Login to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Package chart
+        run: |
+          helm package charts/serverscom-rbs-csi --version "${CHART_VERSION}"
+
+      - name: Push to GHCR
+        run: |
+          helm push "serverscom-rbs-csi-${CHART_VERSION}.tgz" oci://ghcr.io/${{ github.repository_owner }}/charts
 
       - name: Upload deploy manifest to chart release
         env:
