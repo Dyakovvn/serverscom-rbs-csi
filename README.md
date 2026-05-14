@@ -18,15 +18,15 @@ Kubernetes CSI driver for Remote Block Storage (RBS) - dynamic provisioning and 
 ### Install with Helm
 
 ```bash
-helm install rbs-csi oci://ghcr.io/serverscom/charts/serverscom-rbs-csi \
+helm repo add serverscom https://serverscom.github.io/serverscom-rbs-csi
+helm repo update
+
+helm install rbs-csi serverscom/serverscom-rbs-csi \
   --namespace kube-system \
-  --create-namespace \
   --set api.token=YOUR_API_TOKEN \
   --set storageClasses[0].flavor=Performance \
   --set storageClasses[0].location=AMS7
 ```
-
-To install a specific chart version, add `--version 0.1.0`.
 
 ### Install with Raw manifests
 
